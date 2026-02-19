@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>{{ app_name }} - Login</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="auth-bg">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="logo-dot"></div>
+      <div>
+        <h1>{{ app_name }}</h1>
+        <p class="muted">Employees only • @acertax.com</p>
+      </div>
+    </div>
+
+    <div class="form">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="name@acertax.com" autocomplete="username" />
+
+      <label>Password</label>
+      <input id="password" type="password" placeholder="••••••••" autocomplete="current-password" />
+
+      <button id="loginBtn" class="btn-primary">Sign in</button>
+      <div id="err" class="error"></div>
+      <div class="hint">Forgot password? Use Firebase Auth reset flow (can be added).</div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <script src="{{ url_for('static', filename='js/firebase-init.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>

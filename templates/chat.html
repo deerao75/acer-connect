@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="app-bg">
+  <div class="topbar">
+    <div class="brand-mini">
+      <div class="logo-dot"></div>
+      <span>{{ app_name }}</span>
+    </div>
+    <div class="topbar-right">
+      <span class="pill">{{ user.display_name }} ({{ user.role }})</span>
+      <button id="logoutBtn" class="btn-ghost">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="layout">
+      <!-- Left sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-section">
+          <h3>Direct Messages</h3>
+          <div id="userList" class="list"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="row-between">
+            <h3>Groups</h3>
+            <button id="newGroupBtn" class="btn-small">+ New</button>
+          </div>
+          <div id="groupList" class="list"></div>
+        </div>
+      </div>
+
+<!-- Chat panel (must be inside .layout) -->
+<div class="chatwrap" id="chatWrap">
+  <div class="chat-header">
+    <div style="min-width:0; flex:1;">
+      <div id="chatTitle" class="chat-title">Select a chat</div>
+      <div id="chatSubtitle" class="chat-subtitle muted"></div>
+      <div id="typingLine" class="typing-line"></div>
+      <!-- Open chats (DMs / Groups) tabs -->
+      <div id="chatTabs" class="chat-tabs"></div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button id="deleteChatBtn" class="btn-ghost">Delete</button>
+      <button id="minBtn" class="btn-ghost">— Minimize</button>
+    </div>
+  </div>
+
+  <div class="chat-body" id="chatBody"></div>
+
+  <div class="chat-input">
+    <input id="msgInput" type="text" placeholder="Type a message..." autocomplete="off" />
+    <button id="sendBtn" class="btn-primary">Send</button>
+  </div>
+</div>
+
+
+  <!-- Minimized bar -->
+  <div class="minibar hidden" id="miniBar">
+    <span id="miniLabel">Chat minimized</span>
+    <button id="restoreBtn" class="btn-primary">Restore</button>
+  </div>
+
+  <!-- Toast notifications -->
+  <div class="toast-stack" id="toastStack"></div>
+
+  <!-- New group modal -->
+  <div class="modal hidden" id="groupModal">
+    <div class="modal-card">
+      <div class="row-between">
+        <h2>Create Group</h2>
+        <button id="closeGroupModal" class="btn-ghost">✕</button>
+      </div>
+      <label>Group name</label>
+      <input id="groupName" placeholder="e.g., GST Team" />
+      <label>Select members</label>
+      <div id="groupMembers" class="checklist"></div>
+      <button id="createGroupBtn" class="btn-primary">Create</button>
+      <div id="groupErr" class="error"></div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+  <div class="muted" style="font-size:12px;">Logged in as</div>
+  <div id="loggedInAs" style="font-weight:900;"></div>
+  </div>
+
+
+
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <script>
+    window.ACERTAX_USER = {{ user|tojson }};
+  </script>
+
+  <script src="{{ url_for('static', filename='js/firebase-init.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+</body>
+</html>
