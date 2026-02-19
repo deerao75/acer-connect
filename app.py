@@ -589,5 +589,84 @@ def api_mark_read():
     return jsonify({"ok": True})
 
 
+@app.get("/api/group/<group_id>")
+@login_required
+def api_group_detail(group_id):
+    uid = session["user"]["uid"]
+
+    gdoc = db.collection("groups").document(group_id).get()
+    if not gdoc.exists:
+        return jsonify({"ok": False, "error": "Group not found"}), 404
+
+    d = gdoc.to_dict() or {}
+    members = d.get("members", [])
+
+    if uid not in members:
+        return jsonify({"ok": False, "error": "Not a member"}), 403
+
+    # Map member uids -> names/emails from Firestore users collection
+    member_profiles = []
+    for mid in members:
+        udoc = db.collection("users").document(mid).get()
+        ud = udoc.to_dict() or {}
+        member_profiles.append({
+            "uid": mid,
+            "email": ud.get("email", ""),
+            "display_name": ud.get("display_name") or (ud.get("email","").split("@")[0] if ud.get("email") else mid),
+            "online": bool(ud.get("online", False)),
+        })
+
+    # sort online first then name
+    member_profiles.sort(key=lambda x: (not x["online"], (x["display_name"] or "").lower()))
+
+    return jsonify({
+        "ok": True,
+        "group": {
+            "group_id": group_id,
+            "name": d.get("name", "Unnamed Group"),
+            "created_by": d.get("created_by"),
+            "members": member_profiles
+        }
+    })
+
+@app.post("/api/delete_group")
+@login_required
+def api_delete_group():
+    uid = session["user"]["uid"]
+    email = (session["user"].get("email") or "").lower()
+    data = request.get_json(force=True) or {}
+    group_id = data.get("group_id")
+
+    if not group_id:
+        return jsonify({"ok": False, "error": "group_id required"}), 400
+
+    gref = db.collection("groups").document(group_id)
+    gdoc = gref.get()
+    if not gdoc.exists:
+        return jsonify({"ok": False, "error": "Group not found"}), 404
+
+    d = gdoc.to_dict() or {}
+    members = d.get("members", [])
+
+    if uid not in members:
+        return jsonify({"ok": False, "error": "Not a member"}), 403
+
+    is_creator = (d.get("created_by") == uid)
+    is_admin = (email == "deepak.rao@acertax.com")
+
+    if not (is_creator or is_admin):
+        return jsonify({"ok": False, "error": "Only group creator/admin can delete"}), 403
+
+    # delete group doc
+    gref.delete()
+
+    # optional: soft-clean unread counters for this group for all members
+    tid = thread_id_group(group_id)
+    for m in members:
+        db.collection("users").document(m).collection("unread").document(tid).delete()
+
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5001, debug=True)

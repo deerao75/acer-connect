@@ -31,6 +31,14 @@ const groupErrEl = document.getElementById("groupErr");
 
 const deleteChatBtn = document.getElementById("deleteChatBtn");
 
+const groupInfoBtn = document.getElementById("groupInfoBtn");
+const deleteGroupBtn = document.getElementById("deleteGroupBtn");
+
+const groupInfoModal = document.getElementById("groupInfoModal");
+const closeGroupInfo = document.getElementById("closeGroupInfo");
+const groupInfoTitle = document.getElementById("groupInfoTitle");
+const groupInfoList = document.getElementById("groupInfoList");
+
 let USERS = [];
 let GROUPS = [];
 
@@ -305,6 +313,8 @@ function renderTabs() {
           setChatTitle("Select a chat", "");
           chatBodyEl.innerHTML = "";
           if (typingLineEl) typingLineEl.textContent = "";
+          hide(groupInfoBtn);
+          hide(deleteGroupBtn);
         }
 
         renderTabs();
@@ -348,6 +358,9 @@ async function switchToChat(key) {
   markReadForKey(key).catch(() => {});
 
   if (info.type === "dm") {
+    hide(groupInfoBtn);
+    hide(deleteGroupBtn);
+
     const u = USERS.find(x => x.uid === info.other_uid);
     setChatTitle(userDisplay(u || {display_name: info.label}), (u?.online ? "Available" : "Not available"));
     await ensureSocket();
@@ -367,6 +380,9 @@ async function switchToChat(key) {
   }
 
   if (info.type === "group") {
+    show(groupInfoBtn);
+    show(deleteGroupBtn);
+
     const g = GROUPS.find(x => x.group_id === info.group_id);
     setChatTitle(`# ${g?.name || info.label}`, `${g?.members?.length || 0} members`);
     await ensureSocket();
@@ -380,6 +396,52 @@ async function switchToChat(key) {
       OPEN.set(key, info);
     }
     renderFromCache(key);
+
+    // Group info click -> load members and show modal
+    groupInfoBtn.onclick = async () => {
+      const res = await fetch(`/api/group/${info.group_id}`);
+      const j = await res.json().catch(() => ({}));
+      if (!j.ok) return;
+      groupInfoTitle.textContent = `${j.group.name} — Members`;
+      renderGroupMembers(j.group.members || []);
+      show(groupInfoModal);
+    };
+
+    // Delete group click (creator/admin only)
+    deleteGroupBtn.onclick = async () => {
+      if (!confirm("Delete this group for everyone? This cannot be undone.")) return;
+      const res = await fetch("/api/delete_group", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ group_id: info.group_id })
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(j.error || "Failed to delete group.");
+        return;
+      }
+
+      // close this chat and refresh
+      OPEN.delete(key);
+      CACHE.delete(key);
+      clearTypingUIForChat(key);
+
+      if (currentChatKey === key) {
+        currentChatKey = null;
+        currentRoom = null;
+        setChatTitle("Select a chat", "");
+        chatBodyEl.innerHTML = "";
+        if (typingLineEl) typingLineEl.textContent = "";
+        hide(groupInfoBtn);
+        hide(deleteGroupBtn);
+      }
+
+      renderTabs();
+      await loadGroups();
+      renderUsers();
+      renderGroups();
+      hide(groupInfoModal);
+    };
   }
 }
 
@@ -696,14 +758,40 @@ createGroupBtn.addEventListener("click", async () => {
   await loadGroups();
 });
 
+function show(el){ if (el) el.classList.remove("hidden"); }
+function hide(el){ if (el) el.classList.add("hidden"); }
+
+function renderGroupMembers(members){
+  groupInfoList.innerHTML = "";
+  for (const m of members) {
+    const row = document.createElement("div");
+    row.className = "checkrow";
+    row.innerHTML = `
+      <div class="presence ${m.online ? "on" : "off"}"></div>
+      <div style="display:flex;flex-direction:column;">
+        <div style="font-weight:900;">${escapeHtml(m.display_name || m.email || m.uid)}</div>
+        <div class="small muted">${escapeHtml(m.email || "")}</div>
+      </div>
+    `;
+    groupInfoList.appendChild(row);
+  }
+}
+
+// Group info modal close
+if (closeGroupInfo) {
+  closeGroupInfo.addEventListener("click", () => hide(groupInfoModal));
+}
+
 // Boot
 async function boot() {
   setLoggedInAs();
   await ensureNotificationPermission();
   await loadUsers();
   await loadGroups();
-  await loadUnread(); // ✅ NEW: load persisted unread counts
+  await loadUnread(); // ✅ load persisted unread counts
   await ensureSocket();
   updateTypingLine();
+  hide(groupInfoBtn);
+  hide(deleteGroupBtn);
 }
 boot();

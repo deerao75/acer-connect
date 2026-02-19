@@ -49,6 +49,9 @@
     <div style="display:flex; gap:10px; align-items:center;">
       <button id="deleteChatBtn" class="btn-ghost">Delete</button>
       <button id="minBtn" class="btn-ghost">— Minimize</button>
+      <button id="groupInfoBtn" class="btn-ghost hidden">Group info</button>
+      <button id="deleteGroupBtn" class="btn-ghost hidden">Delete group</button>
+
     </div>
   </div>
 
@@ -91,8 +94,15 @@
   <div id="loggedInAs" style="font-weight:900;"></div>
   </div>
 
-
-
+  <div class="modal hidden" id="groupInfoModal">
+    <div class="modal-card">
+      <div class="row-between">
+        <h2 id="groupInfoTitle">Group</h2>
+        <button id="closeGroupInfo" class="btn-ghost">✕</button>
+      </div>
+      <div id="groupInfoList" class="checklist"></div>
+    </div>
+  </div>
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
