@@ -69,6 +69,7 @@ def ensure_user_profile(uid: str, email: str):
             "online": False,
             "last_seen": utc_now_iso(),
             "created_at": utc_now_iso(),
+            "first_login": True,
         }, merge=True)
 
 def set_presence(uid: str, online: bool):
@@ -171,11 +172,24 @@ def session_login():
         "role": profile.get("role", "employee"),
         "display_name": profile.get("display_name", email.split("@")[0]),
     }
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "first_login": profile.get("first_login", False)})
 
 @app.post("/logout")
 def logout():
     session.clear()
+    return jsonify({"ok": True})
+
+@app.post("/api/change_password")
+@login_required
+def api_change_password():
+    data = request.get_json(force=True)
+    new_password = data.get("password", "")
+    if len(new_password) < 6:
+        return jsonify({"ok": False, "error": "Password must be at least 6 characters"}), 400
+    uid = session["user"]["uid"]
+    auth.update_user(uid, password=new_password)
+    db.collection("users").document(uid).update({"first_login": False})
+    session["user"]["first_login"] = False
     return jsonify({"ok": True})
 
 from firebase_admin import auth
