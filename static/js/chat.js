@@ -782,16 +782,20 @@ if (closeGroupInfo) {
   closeGroupInfo.addEventListener("click", () => hide(groupInfoModal));
 }
 
-// Boot
 async function boot() {
   setLoggedInAs();
   await ensureNotificationPermission();
   await loadUsers();
   await loadGroups();
-  await loadUnread(); // ✅ load persisted unread counts
+  await loadUnread();
   await ensureSocket();
   updateTypingLine();
   hide(groupInfoBtn);
   hide(deleteGroupBtn);
+
+  // Refresh user presence every 30 seconds
+  setInterval(async () => {
+    await loadUsers();
+  }, 30000);
 }
 boot();
