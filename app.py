@@ -163,6 +163,7 @@ def session_login():
         return jsonify({"ok": False, "error": "Only @acertax.com emails allowed"}), 403
 
     ensure_user_profile(uid, email)
+    set_presence(uid, True)
 
     # pull profile
     profile = db.collection("users").document(uid).get().to_dict() or {}
