@@ -1,18 +1,3 @@
-const ENCRYPT_KEY = "acertax-connect-secret-2026";
-
-function encryptMsg(text) {
-  return CryptoJS.AES.encrypt(text, ENCRYPT_KEY).toString();
-}
-
-function decryptMsg(cipher) {
-  try {
-    const bytes = CryptoJS.AES.decrypt(cipher, ENCRYPT_KEY);
-    return bytes.toString(CryptoJS.enc.Utf8) || cipher;
-  } catch (e) {
-    return cipher;
-  }
-}
-
 let socket = null;
 
 let currentChatKey = null;    // e.g. "dm:<uid>" or "group:<id>"
@@ -130,7 +115,7 @@ function appendMessage(msg, isMine) {
   const bubble = document.createElement("div");
   bubble.className = "msg-bubble";
   bubble.innerHTML = `
-    <div class="msg-text">${escapeHtml(decryptMsg(msg.text))}</div>
+    <div class="msg-text">${escapeHtml(msg.text)}</div>
     <div class="msg-meta">${new Date(msg.ts).toLocaleString()}</div>
   `;
   row.appendChild(bubble);
@@ -346,15 +331,18 @@ function renderTabs() {
 }
 
 async function switchToChat(key) {
+  // switch first, clear immediately to prevent overlap
   currentChatKey = key;
   currentRoom = null;
   chatBodyEl.innerHTML = "";
 
+  // clear typing line for new chat (will be repopulated if events arrive)
   updateTypingLine();
 
   const info = OPEN.get(key);
   if (!info) return;
 
+  // show whatever we already have instantly
   renderFromCache(key);
 
   info.unread = 0;
@@ -366,6 +354,7 @@ async function switchToChat(key) {
   renderGroups();
   restoreChat();
 
+  // ✅ Persist read state (unread should survive logout/login)
   markReadForKey(key).catch(() => {});
 
   if (info.type === "dm") {
@@ -408,6 +397,7 @@ async function switchToChat(key) {
     }
     renderFromCache(key);
 
+    // Group info click -> load members and show modal
     groupInfoBtn.onclick = async () => {
       const res = await fetch(`/api/group/${info.group_id}`);
       const j = await res.json().catch(() => ({}));
@@ -417,6 +407,7 @@ async function switchToChat(key) {
       show(groupInfoModal);
     };
 
+    // Delete group click (creator/admin only)
     deleteGroupBtn.onclick = async () => {
       if (!confirm("Delete this group for everyone? This cannot be undone.")) return;
       const res = await fetch("/api/delete_group", {
@@ -430,6 +421,7 @@ async function switchToChat(key) {
         return;
       }
 
+      // close this chat and refresh
       OPEN.delete(key);
       CACHE.delete(key);
       clearTypingUIForChat(key);
@@ -477,10 +469,11 @@ async function ensureSocket() {
     const u = USERS.find(x => x.uid === p.uid);
     if (u) {
       u.online = !!p.online;
-      renderUsers();
+      renderUsers(); // update dots
     }
   });
 
+  // Typing updates
   socket.on("typing_update", (p) => {
     let key = null;
 
@@ -496,12 +489,14 @@ async function ensureSocket() {
 
     setPeerTyping(key, p.from_uid, !!p.is_typing);
 
+    // safety auto-clear
     if (p.is_typing) {
       setTimeout(() => setPeerTyping(key, p.from_uid, false), 3500);
     }
   });
 
   socket.on("new_message", (msg) => {
+    // Determine which chat key it belongs to
     let key = null;
     if (msg.type === "dm") {
       const my = window.ACERTAX_USER.uid;
@@ -512,10 +507,12 @@ async function ensureSocket() {
     }
     if (!key) return;
 
+    // cache it
     const arr = CACHE.get(key) || [];
     arr.push(msg);
     CACHE.set(key, arr);
 
+    // if chat not open, open it in background (tabs)
     if (!OPEN.has(key)) {
       if (msg.type === "dm") {
         const u = USERS.find(x => x.uid === ((msg.from_uid === window.ACERTAX_USER.uid) ? msg.to_uid : msg.from_uid));
@@ -532,11 +529,13 @@ async function ensureSocket() {
     const isMine = msg.from_uid === window.ACERTAX_USER.uid;
     const info = OPEN.get(key);
 
+    // If active chat, render immediately
     if (key === currentChatKey) {
       appendMessage(msg, isMine);
       return;
     }
 
+    // otherwise unread + toast + desktop notify
     if (!isMine) {
       info.unread = (info.unread || 0) + 1;
       OPEN.set(key, info);
@@ -544,8 +543,8 @@ async function ensureSocket() {
       renderUsers();
       renderGroups();
 
-      toast(info.label, decryptMsg(msg.text));
-      maybeDesktopNotify(info.label, decryptMsg(msg.text));
+      toast(info.label, msg.text);
+      maybeDesktopNotify(info.label, msg.text);
     }
   });
 }
@@ -587,6 +586,7 @@ function renderUsers() {
       `;
 
       item.addEventListener("click", async () => {
+        // open tab
         if (!OPEN.has(key)) {
           OPEN.set(key, { type:"dm", other_uid: u.uid, label: userDisplay(u), unread:0, messagesLoaded:false });
         }
@@ -643,13 +643,13 @@ document.getElementById("sendBtn").addEventListener("click", async () => {
   const info = OPEN.get(currentChatKey);
   if (!info) return;
 
-  const encryptedText = encryptMsg(text);
   if (info.type === "dm") {
-    socket.emit("send_dm", { to_uid: info.other_uid, text: encryptedText });
+    socket.emit("send_dm", { to_uid: info.other_uid, text });
   } else {
-    socket.emit("send_group", { group_id: info.group_id, text: encryptedText });
+    socket.emit("send_group", { group_id: info.group_id, text });
   }
 
+  // stop typing on send
   const ctx = keyRoomForCurrent();
   if (ctx) {
     if (ctx.kind === "dm") socket.emit("typing_dm", { other_uid: ctx.other_uid, is_typing: false });
@@ -702,6 +702,7 @@ deleteChatBtn.addEventListener("click", async () => {
 
   if (!res.ok) return;
 
+  // clear local UI/cache for this chat
   CACHE.set(currentChatKey, []);
   renderFromCache(currentChatKey);
 });
@@ -787,15 +788,10 @@ async function boot() {
   await ensureNotificationPermission();
   await loadUsers();
   await loadGroups();
-  await loadUnread();
+  await loadUnread(); // ✅ load persisted unread counts
   await ensureSocket();
   updateTypingLine();
   hide(groupInfoBtn);
   hide(deleteGroupBtn);
-
-  // Refresh user presence every 30 seconds
-  setInterval(async () => {
-    await loadUsers();
-  }, 30000);
 }
 boot();
