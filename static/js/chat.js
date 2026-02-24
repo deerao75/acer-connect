@@ -114,7 +114,11 @@ function appendMessage(msg, isMine) {
 
   const bubble = document.createElement("div");
   bubble.className = "msg-bubble";
+  const senderName = !isMine && msg.from_uid
+    ? (USERS.find(u => u.uid === msg.from_uid)?.display_name || msg.from_uid.split("@")[0])
+    : "";
   bubble.innerHTML = `
+    ${!isMine && senderName ? `<div class="msg-sender">${escapeHtml(senderName)}</div>` : ""}
     <div class="msg-text">${escapeHtml(msg.text)}</div>
     <div class="msg-meta">${new Date(msg.ts).toLocaleString()}</div>
   `;
